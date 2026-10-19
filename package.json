@@ -1,0 +1,83 @@
+{
+  "name": "arcaw",
+  "version": "1.0.0",
+  "description": "Arcaw - Desktop code editor",
+  "main": "main.js",
+  "author": "Arcaw",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --publish never",
+    "dist:portable": "electron-builder --win portable --publish never",
+    "release": "electron-builder --win nsis --publish always"
+  },
+  "dependencies": {
+    "monaco-editor": "0.52.2",
+    "@lydell/node-pty": "latest",
+    "@xterm/xterm": "5.5.0",
+    "@xterm/addon-fit": "0.10.0",
+    "@xterm/addon-web-links": "0.11.0",
+    "@xterm/addon-webgl": "0.18.0",
+    "electron-updater": "^6.3.0"
+  },
+  "devDependencies": {
+    "electron": "latest",
+    "electron-builder": "latest"
+  },
+  "build": {
+    "appId": "com.arcaw.app",
+    "productName": "Arcaw",
+    "fileAssociations": [
+    {
+      "ext": ["js", "ts", "html", "css", "json", "md", "txt"],
+      "name": "Text Files",
+      "role": "Editor"
+    }
+  ],
+    "copyright": "Arcaw",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "**/*",
+      "!node_modules/monaco-editor/esm/**",
+      "!node_modules/monaco-editor/dev/**",
+      "!node_modules/monaco-editor/min-maps/**",
+      "!**/*.map"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "artifactName": "Arcaw-Setup-${version}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "arcaw",
+        "repo": "arcaw",
+        "releaseType": "release"
+      }
+    ],
+    "asarUnpack": [
+      "node_modules/@lydell/**"
+    ],
+    "npmRebuild": false
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

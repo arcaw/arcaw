@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Arcaw</title>
+<link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header id="title">
+  <div class="brand"><i class="fa-brands fa-atom"></i><b>Arcaw</b></div>
+  <nav id="menus"></nav>
+  <div id="wtitle"></div>
+  <div class="wc">
+    <button id="w-min"><i class="fa-solid fa-minus"></i></button>
+    <button id="w-max"><i class="fa-regular fa-square"></i></button>
+    <button id="w-close" class="x"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+</header>
+<div id="mid">
+  <aside id="act">
+    <div>
+      <button data-view="explorer" title="Explorer (Ctrl+Shift+E)"><i class="fa-regular fa-folder-closed"></i></button>
+      <button data-view="search" title="Search (Ctrl+Shift+F)"><i class="fa-solid fa-magnifying-glass"></i></button>
+      <button data-view="git" title="Source Control (Ctrl+Shift+G)"><i class="fa-solid fa-code-branch"></i><span id="g-badge" class="badge hidden"></span></button>
+    </div>
+    <div>
+      <button data-cmd="View: Toggle Terminal" title="Terminal (Ctrl+`)"><i class="fa-solid fa-terminal"></i></button>
+      <button data-cmd="Preferences: Settings" title="Settings (Ctrl+,)"><i class="fa-solid fa-gear"></i></button>
+    </div>
+  </aside>
+  <div id="side">
+    <div class="sh"><span id="side-title">EXPLORER</span>
+      <span class="sh-a" id="sh-ex"><button data-cmd="File: New File" title="New File"><i class="fa-solid fa-file-circle-plus"></i></button>
+      <button data-cmd="File: New Folder" title="New Folder"><i class="fa-solid fa-folder-plus"></i></button>
+      <button id="tree-refresh" title="Refresh"><i class="fa-solid fa-rotate"></i></button></span>
+      <span class="sh-a hidden" id="sh-git"><button id="g-refresh" title="Refresh"><i class="fa-solid fa-rotate-right"></i></button></span></div>
+    <div id="v-explorer" class="sv" tabindex="0"><div id="tree"></div></div>
+    <div id="v-search" class="sv hidden">
+      <div class="pad"><div class="sin"><i class="fa-solid fa-magnifying-glass"></i><input id="s-in" placeholder="Search in workspace" spellcheck="false"><button id="s-case-btn" class="tg" title="Match Case">Aa</button></div>
+      <input type="checkbox" id="s-case" class="hidden"></div>
+      <div id="s-head" class="s-head">RESULTS (0)</div>
+      <div id="s-out"></div>
+    </div>
+    <div id="v-git" class="sv hidden">
+      <div id="g-empty" class="g-empty hidden"></div>
+      <div id="g-main">
+        <div class="g-top">
+          <button id="g-branch" class="g-branch" title="Switch branch"></button>
+          <span class="g-tools">
+            <button id="g-sync" title="Sync Changes"><i class="fa-solid fa-arrows-rotate"></i><span></span></button>
+            <button id="g-fetch" title="Fetch"><i class="fa-solid fa-cloud-arrow-down"></i></button>
+          </span>
+        </div>
+        <div class="g-commit">
+          <textarea id="g-msg" rows="1" spellcheck="false" placeholder="Message (Ctrl+Enter to commit)"></textarea>
+          <div class="g-cb">
+            <span id="g-count" class="g-count"></span>
+            <div class="g-split"><button id="g-commit" class="btn"><i class="fa-solid fa-check"></i> Commit</button><button id="g-more" class="btn" title="More commit actions"><i class="fa-solid fa-chevron-down"></i></button></div>
+          </div>
+        </div>
+        <div id="g-list"></div>
+      </div>
+    </div>
+  </div>
+  <div id="rz-side" class="rz-h"></div>
+  <main id="main">
+    <div id="tabs"></div>
+    <div id="stage">
+      <div id="ed"><div id="editor-host"></div>
+        <div id="settings" class="hidden"></div>
+        <div id="welcome" class="hidden">
+          <i class="fa-brands fa-atom big"></i><h1>ARCAW</h1><p>A hackable text editor for the 21st century</p>
+          <div class="cards">
+            <div data-cmd="File: Open Folder…"><i class="fa-regular fa-folder-open"></i><b>Open Folder</b><small>Ctrl+O</small></div>
+            <div data-cmd="File: Open File…"><i class="fa-regular fa-file"></i><b>Open File</b><small>Ctrl+Shift+O</small></div>
+            <div data-cmd="View: Command Palette"><i class="fa-solid fa-terminal"></i><b>Command Palette</b><small>Ctrl+Shift+P</small></div>
+            <div data-cmd="Preferences: Color Theme"><i class="fa-solid fa-palette"></i><b>Choose Theme</b><small>5 themes</small></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="rz-panel" class="rz-v hidden"></div>
+    <div id="panel" class="hidden">
+      <div class="ph"><span class="tt">TERMINAL</span>
+        <span class="tools">
+          <button id="t-new" title="New Terminal (Ctrl+Shift+`)"><i class="fa-solid fa-plus"></i></button>
+          <button id="t-caret" title="Select shell"><i class="fa-solid fa-chevron-down"></i></button>
+          <button id="t-more" title="More actions"><i class="fa-solid fa-ellipsis"></i></button>
+          <button id="t-max" title="Maximize panel"><i class="fa-solid fa-expand"></i></button>
+          <button id="t-close" title="Close panel"><i class="fa-solid fa-xmark"></i></button>
+        </span></div>
+      <div id="pbody"><div id="tviews"></div><div id="tlist"></div></div>
+    </div>
+  </main>
+</div>
+<footer id="status">
+  <div><button id="st-branch" title="Switch branch"><i class="fa-solid fa-code-branch"></i> –</button><span id="st-saved"></span><button id="st-update" class="hidden"></button></div>
+  <div><span id="st-pos">Ln 1, Col 1</span><span id="st-tab"></span><span>UTF-8</span><span id="st-eol">LF</span><span id="st-lang">Plain Text</span></div>
+</footer>
+<div id="modal" class="hidden"><div id="modal-box"></div></div>
+<div id="ctx" class="hidden"></div>
+<div id="toasts"></div>
+<!-- xterm UMD builds must load BEFORE the Monaco AMD loader (define() conflict) -->
+<script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
+<script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+<script src="../node_modules/@xterm/addon-web-links/lib/addon-web-links.js"></script>
+<script src="../node_modules/@xterm/addon-webgl/lib/addon-webgl.js"></script>
+<script src="../node_modules/monaco-editor/min/vs/loader.js"></script>
+<script src="icons.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
