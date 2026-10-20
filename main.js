@@ -15,6 +15,16 @@ const exists_ = async f => { try { await fs.access(f); return true; } catch { re
 const stateFile = () => path.join(app.getPath('userData'), 'state.json');
 let win, force = false;
 
+/* ---- "Open with" / file association: paths arrive via argv (first launch and second-instance) ---- */
+const argFiles = argv => argv.slice(app.isPackaged ? 1 : 2).filter(a => a && !a.startsWith('-') && !/^(data|http|https):/i.test(a)).map(a => path.resolve(a));
+let pendingOpen = argFiles(process.argv), rendererReady = false;
+async function dispatchOpen(list) {
+  const ok = [];
+  for (const p of list) if (await exists_(p)) ok.push(p);
+  if (!ok.length) return;
+  if (rendererReady && win && !win.isDestroyed()) win.webContents.send('app:open', ok); else pendingOpen.push(...ok);
+}
+
 const BLOCKED_KEYS = new Set(['F12', 'F5']);
 function create() {
   Menu.setApplicationMenu(null);
@@ -53,7 +63,7 @@ function create() {
 }
 if (gotLock) app.whenReady().then(() => { create(); initUpdater(); });
 app.on('window-all-closed', () => app.quit());
-app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
+app.on('second-instance', (_e, argv) => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } dispatchOpen(argFiles(argv)); });
 
 /* ---------- Remote updates (electron-updater; works for the installed NSIS build) ---------- */
 let updater = null, upd = { state: 'idle' };
@@ -77,12 +87,17 @@ h('win:max', () => (win.isMaximized() ? win.unmaximize() : win.maximize()));
 h('win:close', () => win.close());
 h('win:fullscreen', () => win.setFullScreen(!win.isFullScreen()));
 h('win:force', () => { force = true; win.close(); });
+h('app:pending', () => { rendererReady = true; const l = pendingOpen; pendingOpen = []; return l; });
 h('update:state', () => upd);
 h('update:check', () => { if (!updater) return { state: 'unsupported' }; checkUpdates(); return upd; });
 h('update:install', () => { if (updater && upd.state === 'ready') { force = true; updater.quitAndInstall(true, true); } });
 
 h('state:get', async () => { try { return JSON.parse(await fs.readFile(stateFile(), 'utf8')); } catch { return {}; } });
 h('state:set', s => fs.writeFile(stateFile(), JSON.stringify(s)));
+// notes live in their own file so they are never lost when the UI state is rewritten
+const notesFile = () => path.join(app.getPath('userData'), 'notes.json');
+h('notes:get', async () => { try { const n = JSON.parse(await fs.readFile(notesFile(), 'utf8')); return Array.isArray(n) ? n : []; } catch { return []; } });
+h('notes:set', async n => { const f = notesFile(), t = f + '.tmp'; await fs.writeFile(t, JSON.stringify(Array.isArray(n) ? n : [])); await fs.rename(t, f); });
 
 h('dlg:folder', async () => { const r = await dialog.showOpenDialog(win, { properties: ['openDirectory'] }); return r.canceled ? null : r.filePaths[0]; });
 h('dlg:files', async () => { const r = await dialog.showOpenDialog(win, { properties: ['openFile', 'multiSelections'] }); return r.canceled ? [] : r.filePaths; });

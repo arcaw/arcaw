@@ -95,7 +95,7 @@ function applySettings() {
   persist();
 }
 const SETTINGS = 'arcaw://settings', WELCOME = 'arcaw://welcome';
-const isVirtual = p => p === SETTINGS || p === WELCOME;
+const isVirtual = p => !!p && (p === SETTINGS || p === WELCOME || p.startsWith('arcaw://note/'));
 const SETNAV = [['core', 'Core', 'fa-sliders'], ['editor', 'Editor', 'fa-code'], ['terminal', 'Terminal', 'fa-terminal'], ['themes', 'Themes', 'fa-palette'], ['keys', 'Keybindings', 'fa-keyboard'], ['packages', 'Packages', 'fa-cubes'], ['system', 'System', 'fa-desktop']];
 let setCat = 'core';
 function control(k, type, opts) {
@@ -121,7 +121,7 @@ function renderSettings() {
     for (const [k, t] of Object.entries(THEMES)) { const c = el('div', 'tc' + (k === S.theme ? ' on' : ''), `<div class="sw" style="background:${t.bg}"><span style="background:${t.side}"></span><i style="background:${t.accent}"></i><i style="background:${t.kw}"></i><i style="background:${t.str}"></i><i style="background:${t.fn}"></i></div><b>${t.n}</b>`); c.onclick = () => { S.theme = k; applySettings(); renderSettings(); }; g.append(c); }
     body.append(g);
   } else if (setCat === 'keys') {
-    head('Keybindings', 'Shortcuts for every command. Press Ctrl+Shift+P to run any command by name.');
+    head('Keybindings', 'Shortcuts for every command. Press Ctrl+Shift+P to search inside files; Ctrl+P then > runs a command by name.');
     const f = el('input'); f.placeholder = 'Filter commands…'; f.style.cssText = 'width:100%;margin-bottom:10px'; const list = el('div');
     const draw = () => { list.innerHTML = ''; CMDS.filter(c => c[0].toLowerCase().includes(f.value.toLowerCase())).forEach(c => list.append(el('div', 'kb', `<span>${esc(c[0])}</span>${c[1] ? `<kbd>${esc(c[1])}</kbd>` : '<span></span>'}`))); };
     f.oninput = draw; draw(); body.append(f, list);
@@ -150,15 +150,15 @@ function updateStatus() {
 function renderTabs() {
   const box = $('#tabs'); box.innerHTML = '';
   for (const p of order) {
-    const f = files.get(p), isS = p === SETTINGS, isW = p === WELCOME;
+    const f = files.get(p), isS = p === SETTINGS, isW = p === WELCOME, nt = noteOf(p);
     const t = el('div', 'tab tab-item' + (p === active ? ' on' : ''));
-    t.title = isW ? 'Welcome' : p;
+    t.title = isW ? 'Welcome' : nt ? (nt.title || 'Untitled') : p;
 
     // Sizin istediğiniz HTML yapısına göre oluşturulan kısım:
     t.innerHTML = `
       <div class="tab-left">
-        <i class="${isS ? 'fa-solid fa-sliders' : isW ? 'fa-brands fa-atom' : iconFor({ name: base(p) })}"></i>
-        <span class="tab-title">${isS ? 'Settings' : isW ? 'Welcome' : esc(base(p))}</span>
+        <i class="${isS ? 'fa-solid fa-sliders' : isW ? 'fa-brands fa-atom' : nt ? 'fa-solid fa-note-sticky' : iconFor({ name: base(p) })}"></i>
+        <span class="tab-title">${isS ? 'Settings' : isW ? 'Welcome' : nt ? esc(nt.title || 'Untitled') : esc(base(p))}</span>
       </div>
       <span class="cl tab-close">${f && f.dirty ? '<i class="fa-solid fa-circle dot"></i>' : '<i class="fa-solid fa-xmark"></i>'}</span>
     `;
@@ -192,12 +192,12 @@ async function openFile(p, line, keepFocus) {
 function activate(p) {
   if (active && files.has(active) && editor) files.get(active).view = editor.saveViewState();
   active = p; const isS = p === SETTINGS, isW = p === WELCOME; if (!isVirtual(p)) { selected = p; if (!sels.has(p)) { sels = new Set([p]); anchor = p; } }
-  $('#welcome').classList.toggle('hidden', !isW); $('#settings').classList.toggle('hidden', !isS);
-  if (isS) renderSettings(); else if (isW) { if (editor) editor.setModel(null); } else { const f = files.get(p); editor.setModel(f.model); if (f.view) editor.restoreViewState(f.view); }
+  const isN = p.startsWith('arcaw://note/'); $('#welcome').classList.toggle('hidden', !isW); $('#settings').classList.toggle('hidden', !isS); $('#notepane').classList.toggle('hidden', !isN);
+  if (isN) { if (editor) editor.setModel(null); renderNotePane(); renderNotes(); } else if (isS) renderSettings(); else if (isW) { if (editor) editor.setModel(null); } else { const f = files.get(p); editor.setModel(f.model); if (f.view) editor.restoreViewState(f.view); }
   renderTabs(); updateStatus(); markTree(); persist();
 }
 // nothing left open: the editor area is simply empty (no page is forced back on screen)
-function showWelcome() { active = null; $('#settings').classList.add('hidden'); $('#welcome').classList.add('hidden'); if (editor) editor.setModel(null); renderTabs(); updateStatus(); persist(); }
+function showWelcome() { active = null; $('#notepane').classList.add('hidden'); $('#settings').classList.add('hidden'); $('#welcome').classList.add('hidden'); if (editor) editor.setModel(null); renderTabs(); updateStatus(); persist(); }
 async function save(p = active) {
   const f = files.get(p); if (!f) return;
   if (S.trimOnSave || S.finalNewline) {
@@ -655,7 +655,7 @@ function gMoreMenu(e) {
 
 /* diff viewer (Monaco diff editor in a large dialog) */
 let diffView = null;
-function disposeDiff() { if (!diffView) return; const d = diffView; diffView = null; try { d.ed.dispose(); d.models.forEach(m => m.dispose()); } catch { /* already gone */ } }
+function disposeDiff() { if (!diffView) return; const d = diffView; diffView = null; setTimeout(() => { try { d.ed.dispose(); d.models.forEach(m => m.dispose()); } catch { /* already gone */ } }, 50); }   // deferred: Monaco may still be rendering a widget of this editor
 async function gShowDiff(it, staged) {
   if (!window.monaco || !monaco.editor) return toast('Editor is still loading…');
   const show = async spec => { const r = await gitRun(['show', spec]); return r.ok ? r.out : ''; };
@@ -811,19 +811,19 @@ async function checkForUpdates() {
   updManual = true; const r = await api.update_check();
   if (r && r.state === 'unsupported') { updManual = false; toast('Updates work only in the installed version of Arcaw (not portable or dev runs).', 'err'); }
 }
-async function installUpdate() { if (await confirmQuit()) { await api.state_set(snapshot()); api.update_install(); } }
+async function installUpdate() { if (await confirmQuit()) { await notesFlush(); await api.state_set(snapshot()); api.update_install(); } }
 
 /* ---------- Commands, menus, palette ---------- */
 const act = id => () => editor && editor.getAction(id).run();
 const CMDS = [
   ['File: New File', 'Ctrl+N', () => newItem(false)], ['File: New Folder', null, () => newItem(true)],
-  ['File: Open Folder…', 'Ctrl+O', openFolder], ['File: Open File…', 'Ctrl+Shift+O', openFiles],
+  ['View: Notes', '', () => setView('notes')], ['File: Open Folder…', 'Ctrl+O', openFolder], ['File: Open File…', 'Ctrl+Shift+O', openFiles],
   ['File: Save', 'Ctrl+S', () => save()], ['File: Save All', 'Ctrl+Alt+S', saveAll], ['File: Close Tab', 'Ctrl+W', () => active && closeTab(active)],
   ['File: Exit', null, () => api.win_close()],
   ['Edit: Undo', 'Ctrl+Z', act('undo')], ['Edit: Redo', 'Ctrl+Y', act('redo')], ['Edit: Find', 'Ctrl+F', act('actions.find')], ['Edit: Replace', 'Ctrl+H', act('editor.action.startFindReplace')],
   ['Edit: Toggle Comment', 'Ctrl+/', act('editor.action.commentLine')], ['Edit: Format Document', 'Alt+Shift+F', act('editor.action.formatDocument')],
   ['Go: Quick Open File', 'Ctrl+P', () => palette('')], ['Go: Go to Line…', 'Ctrl+G', act('editor.action.gotoLine')],
-  ['View: Command Palette', 'Ctrl+Shift+P', () => palette('>')], ['View: Toggle Sidebar', 'Ctrl+B', () => { $('#side').classList.toggle('hidden'); $('#rz-side').classList.toggle('hidden'); }],
+  ['View: Command Palette', 'Ctrl+Shift+P', () => contentSearch()], ['View: Toggle Sidebar', 'Ctrl+B', () => { $('#side').classList.toggle('hidden'); $('#rz-side').classList.toggle('hidden'); }],
   ['View: Toggle Terminal', 'Ctrl+`', () => toggleTerm()],
   ['Terminal: New Terminal', 'Ctrl+Shift+`', () => newTerm()], ['Terminal: Rename Terminal', null, () => curTerm && renameTerm(curTerm)], ['Terminal: Clear', null, () => curTerm && clearTerm(curTerm)], ['Terminal: Kill Terminal', null, () => curTerm && closeTerm(curTerm)], ['Terminal: Next Terminal', null, () => stepTerm(1)], ['Terminal: Previous Terminal', null, () => stepTerm(-1)],
   ['View: Explorer', 'Ctrl+Shift+E', () => setView('explorer')], ['View: Search', 'Ctrl+Shift+F', () => { setView('search'); $('#s-in').focus(); }], ['View: Source Control', 'Ctrl+Shift+G', () => setView('git')],
@@ -836,7 +836,7 @@ const CMDS = [
   ['View: Zoom In', 'Ctrl+=', () => { S.fontSize = Math.min(32, S.fontSize + 1); applySettings(); }], ['View: Zoom Out', 'Ctrl+-', () => { S.fontSize = Math.max(10, S.fontSize - 1); applySettings(); }],
   ['Preferences: Settings', 'Ctrl+,', openSettings], ['Preferences: Color Theme', null, pickTheme],
   ['Help: Keyboard Shortcuts', null, showShortcuts], ['Help: About', null, showAbout], ['Help: Welcome', null, openWelcome], ['Help: Check for Updates…', null, checkForUpdates],
-  ['Git: Sync Changes', null, () => gSync()], ['Git: Fetch', null, () => gFetch()], ['Git: Switch Branch…', null, () => gBranchMenu()], ['Git: Refresh', null, () => gRefreshNow()]
+  ['Notes: New Category', null, () => addNote()], ['Git: Sync Changes', null, () => gSync()], ['Git: Fetch', null, () => gFetch()], ['Git: Switch Branch…', null, () => gBranchMenu()], ['Git: Refresh', null, () => gRefreshNow()]
 ];
 const byLabel = Object.fromEntries(CMDS.map(c => [c[0], c]));
 const MENUS = { File: ['File: New File', 'File: New Folder', '-', 'File: Open Folder…', 'File: Open File…', '-', 'File: Save', 'File: Save All', 'File: Close Tab', '-', 'File: Copy Path', 'File: Copy Relative Path', '-', 'Preferences: Settings', 'File: Exit'], Edit: ['Edit: Undo', 'Edit: Redo', '-', 'Edit: Find', 'Edit: Replace', 'Edit: Toggle Comment', 'Edit: Format Document'], View: ['View: Command Palette', 'Go: Quick Open File', 'Go: Go to Line…', '-', 'View: Explorer', 'View: Search', 'View: Source Control', '-', 'View: Toggle Sidebar', 'View: Toggle Terminal', '-', 'View: Zoom In', 'View: Zoom Out', 'View: Reset Zoom', 'View: Toggle Full Screen', 'Go: Next Tab', 'Go: Previous Tab', 'Preferences: Color Theme'], Terminal: ['Terminal: New Terminal', 'Terminal: Rename Terminal', 'Terminal: Clear', 'Terminal: Kill Terminal', '-', 'Terminal: Next Terminal', 'Terminal: Previous Terminal', '-', 'View: Toggle Terminal'], Help: ['Help: Keyboard Shortcuts', 'Help: Welcome', '-', 'Help: Check for Updates…', 'Help: About'] };
@@ -850,21 +850,140 @@ function buildMenus() {
     nav.append(mb);
   }
 }
-function palette(prefix, custom) {
-  const b = modal('<div class="pal"><input id="pi" spellcheck="false"><div id="pl" style="max-height:50vh;overflow:auto"></div></div>'), inp = b.querySelector('#pi'), list = b.querySelector('#pl'); let items = [], idx = 0;
-  const render = () => {
-    const raw = inp.value, cmdMode = raw.startsWith('>'), q = raw.replace(/^>/, '').trim().toLowerCase().split(/\s+/).filter(Boolean);
-    const src = custom ? custom : cmdMode ? CMDS.map(c => ({ label: c[0], hint: c[1] || '', run: c[2] })) : fileIndex.map(p => ({ label: base(p), hint: root ? p.slice(root.length + 1) : p, run: () => openFile(p) }));
-    items = src.filter(i => q.every(w => (i.label + ' ' + i.hint).toLowerCase().includes(w))).slice(0, 60); idx = Math.min(idx, Math.max(0, items.length - 1));
-    list.innerHTML = ''; items.forEach((it, n) => { const d = el('div', 'pi' + (n === idx ? ' on' : ''), `<span>${esc(it.label)}</span><small>${esc(it.hint)}</small>`); d.onclick = () => run(n); list.append(d); });
-    const on = list.querySelector('.on'); if (on) on.scrollIntoView({ block: 'nearest' });
+/* ---- Command palette: Files (default) · ">" Commands · ":" Go to line · "file:12" opens at a line ---- */
+const RECENT_KEY = 'arcaw.recentCmds';
+const recentCmds = () => { try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || []; } catch { return []; } };
+const pushRecent = l => { try { localStorage.setItem(RECENT_KEY, JSON.stringify([l, ...recentCmds().filter(x => x !== l)].slice(0, 6))); } catch { /* storage unavailable */ } };
+const hasEditor = () => !!(active && files.has(active));
+function cmdAvailable(c) {   // only offer commands that can actually run right now
+  const l = c[0];
+  if (c[3] === 'explorer' || l === 'View: Command Palette') return false;
+  if (/^Edit:/.test(l) || l === 'Go: Go to Line…' || l === 'File: Save') return hasEditor();
+  if (l === 'File: Save All') return [...files.values()].some(f => f.dirty);
+  if (l === 'File: Close Tab') return !!active;
+  if (l === 'File: Copy Path' || l === 'File: Copy Relative Path') return hasEditor() || !!selected;
+  if (l === 'Go: Next Tab' || l === 'Go: Previous Tab') return order.length > 1;
+  if (/^Terminal: (Rename|Clear|Kill)/.test(l)) return !!curTerm;
+  if (/^Terminal: (Next|Previous)/.test(l)) return terms.length > 1;
+  if (/^Git:/.test(l)) return !!root;
+  return true;
+}
+function fuzzy(text, q) {
+  const t = text.toLowerCase(), i = t.indexOf(q);
+  if (i >= 0) { const b = i === 0 || /[\s\-_./\\:]/.test(t[i - 1]); return { s: 100 - Math.min(i, 50) + (b ? 40 : 0) - (t.length - q.length) * 0.1, p: Array.from({ length: q.length }, (_, k) => i + k) }; }
+  if (q.length < 2) return null;
+  let j = 0, last = -2, gaps = 0; const p = [];
+  for (let k = 0; k < t.length && j < q.length; k++) if (t[k] === q[j]) { if (last >= 0 && k !== last + 1) gaps++; p.push(k); last = k; j++; }
+  return j === q.length ? { s: 40 - gaps * 3 - (t.length - q.length) * 0.1, p } : null;
+}
+function scoreItem(it, qs) {
+  let sc = 0; const pos = new Set();
+  for (const q of qs) {
+    const a = fuzzy(it.label, q);
+    if (a) { sc += a.s + 20; a.p.forEach(x => pos.add(x)); continue; }
+    const b = it.key ? fuzzy(it.key, q) : null; if (!b) return null; sc += b.s;
+  }
+  return { sc, pos };
+}
+function hl(label, pos, cat) {   // highlight matched characters; dim the "Category:" prefix of commands
+  const catLen = cat ? Math.max(0, label.indexOf(': ') + 2) : 0; let out = '', run = '', key = '';
+  const flush = () => { if (!run) return; const [c, m] = key.split('|'); out += (c === '1' ? '<em>' : '') + (m === '1' ? '<mark>' : '') + esc(run) + (m === '1' ? '</mark>' : '') + (c === '1' ? '</em>' : ''); run = ''; };
+  for (let i = 0; i < label.length; i++) { const k = (i < catLen ? 1 : 0) + '|' + (pos && pos.has(i) ? 1 : 0); if (k !== key) { flush(); key = k; } run += label[i]; }
+  flush(); return out;
+}
+/* Ctrl+Shift+P: search inside every file of the open folder and list the files that contain the text */
+function contentSearch() {
+  const b = modal('<div class="pal"><input id="pi" spellcheck="false" autocomplete="off" placeholder="Search text inside files…"><div id="pl"></div><div class="pf"></div></div>'), inp = b.querySelector('#pi'), list = b.querySelector('#pl'), foot = b.querySelector('.pf');
+  let items = [], idx = 0, seq = 0, timer = 0, msg = root ? 'Type to search inside the files of the open folder.' : 'Open a folder first (Ctrl+O) to search inside its files.';
+  const foot_ = () => { foot.innerHTML = '<span>Files containing the text</span><span><b>↑↓</b> navigate &nbsp; <b>Enter</b> open &nbsp; <b>Esc</b> close</span>'; };
+  const snip = (t, q) => { const i = t.toLowerCase().indexOf(q.toLowerCase()); if (i < 0) return esc(t); const a = Math.max(0, i - 30); return (a ? '…' : '') + esc(t.slice(a, i)) + '<mark>' + esc(t.slice(i, i + q.length)) + '</mark>' + esc(t.slice(i + q.length)); };
+  const render = q => {
+    list.innerHTML = ''; foot_();
+    if (!items.length) { list.append(el('div', 'pe', esc(msg))); return; }
+    items.forEach((it, n) => {
+      const rel = root && it.file.startsWith(root) ? it.file.slice(root.length + 1) : it.file;
+      const d = el('div', 'pi' + (n === idx ? ' on' : ''), `<span class="pm"><span class="pn">${esc(base(it.file))}<span class="pd">${esc(dirOf(rel))}</span></span><span class="ps"><b>${it.line}</b> ${snip(it.text, q)}</span></span><small>${it.count} match${it.count === 1 ? '' : 'es'}</small>`);
+      d.onclick = () => run(n); d.onmousemove = () => { if (idx !== n) { list.querySelector('.pi.on')?.classList.remove('on'); idx = n; d.classList.add('on'); } };
+      list.append(d);
+    });
+    const on = list.querySelector('.pi.on'); if (on) on.scrollIntoView({ block: 'nearest' });
   };
-  const run = n => { const it = items[n]; closeModal(); if (it) setTimeout(it.run, 0); };
-  inp.value = prefix; inp.focus(); inp.oninput = () => { idx = 0; render(); };
-  inp.onkeydown = e => { if (e.key === 'ArrowDown') { idx = Math.min(idx + 1, items.length - 1); render(); e.preventDefault(); } else if (e.key === 'ArrowUp') { idx = Math.max(idx - 1, 0); render(); e.preventDefault(); } else if (e.key === 'Enter') run(idx); else if (e.key === 'Escape') closeModal(); };
+  const run = n => { const it = items[n]; if (!it) return; closeModal(); setTimeout(() => openFile(it.file, it.line), 0); };
+  const search = async () => {
+    const q = inp.value.trim(), my = ++seq; idx = 0;
+    if (!q || !root) { items = []; msg = root ? 'Type to search inside the files of the open folder.' : 'Open a folder first (Ctrl+O) to search inside its files.'; render(q); return; }
+    msg = 'Searching…'; items = []; render(q);
+    let res = []; try { res = await api.fs_search(root, q, false); } catch (e) { msg = clean(e); render(q); return; }
+    if (my !== seq) return;
+    const by = new Map();
+    for (const r of res) { const f = by.get(r.file); if (f) f.count++; else by.set(r.file, { file: r.file, line: r.line, text: r.text, count: 1 }); }
+    items = [...by.values()]; msg = 'No files contain this text.'; render(q);
+  };
+  inp.oninput = () => { clearTimeout(timer); timer = setTimeout(search, 250); };
+  inp.onkeydown = e => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (items.length) { idx = (idx + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length; render(inp.value.trim()); } }
+    else if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); if (items.length) run(idx); } else if (e.key === 'Escape') closeModal();
+  };
+  inp.focus(); render('');
+}
+function palette(prefix, custom, placeholder) {
+  const b = modal('<div class="pal"><input id="pi" spellcheck="false" autocomplete="off"><div id="pl"></div><div class="pf"></div></div>'), inp = b.querySelector('#pi'), list = b.querySelector('#pl'), foot = b.querySelector('.pf');
+  let items = [], idx = 0;
+  const fileItems = (q, line) => {
+    const open = order.filter(p => !isVirtual(p)), openSet = new Set(open);
+    const rel = p => (root && p.startsWith(root) ? p.slice(root.length + 1) : p);
+    const mk = (p, g) => ({ label: base(p), sub: dirOf(rel(p)) || '', key: rel(p), group: g, run: () => openFile(p, line) });
+    if (!q.length) return [...open.map(p => mk(p, 'Open')), ...fileIndex.filter(p => !openSet.has(p)).slice(0, 100).map(p => mk(p, 'Files'))];
+    return fileIndex.map(p => mk(p));
+  };
+  const build = () => {
+    const raw = inp.value; let mode = custom ? 'custom' : raw.startsWith('>') ? 'cmd' : raw.startsWith(':') ? 'line' : 'file';
+    let text = mode === 'cmd' || mode === 'line' ? raw.slice(1) : raw, line = 0;
+    if (mode === 'file') { const m = text.match(/^(.*?):(\d+)$/); if (m) { text = m[1]; line = +m[2]; } }
+    const qs = text.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (mode === 'line') {
+      const n = parseInt(text, 10);
+      if (!hasEditor()) return { mode, items: [], empty: 'Open a file to go to a line.' };
+      const max = files.get(active).model.getLineCount();
+      return { mode, items: n >= 1 ? [{ label: `Go to line ${Math.min(n, max)}`, sub: `of ${max}`, run: () => { editor.revealLineInCenter(Math.min(n, max)); editor.setPosition({ lineNumber: Math.min(n, max), column: 1 }); editor.focus(); } }] : [], empty: `Type a line number between 1 and ${files.get(active).model.getLineCount()}.` };
+    }
+    let src;
+    if (mode === 'custom') src = custom;
+    else if (mode === 'cmd') { const rec = recentCmds(); src = CMDS.filter(cmdAvailable).map(c => ({ label: c[0], kbd: c[1] || '', cat: true, rec: rec.indexOf(c[0]), group: !qs.length ? (rec.includes(c[0]) ? 'Recently used' : 'Commands') : null, run: () => { pushRecent(c[0]); c[2](); } })); if (!qs.length) src.sort((x, y) => (x.rec < 0) - (y.rec < 0) || (x.rec - y.rec)); }
+    else src = fileItems(qs, line);
+    let out;
+    if (!qs.length) out = src.map(it => ({ ...it, pos: null }));
+    else out = src.map(it => { const r = scoreItem(it, qs); return r && { ...it, pos: r.pos, sc: r.sc + (it.rec >= 0 ? 15 : 0) }; }).filter(Boolean).sort((x, y) => y.sc - x.sc);
+    const empty = mode === 'file' && !fileIndex.length && !order.some(p => !isVirtual(p)) ? 'Open a folder to search its files (Ctrl+O). Type ">" for commands.' : mode === 'cmd' ? 'No matching commands.' : mode === 'file' ? 'No matching files.' : 'Nothing to show.';
+    return { mode, items: out.slice(0, 80), empty };
+  };
+  const hints = { file: '<b>></b> commands &nbsp; <b>:</b> go to line &nbsp; <b>name:12</b> open at line', cmd: 'Run a command &nbsp; <b>Backspace</b> files', line: 'Go to a line in the current file', custom: '' };
+  const render = () => {
+    const r = build(); items = r.items; idx = Math.min(idx, Math.max(0, items.length - 1));
+    inp.placeholder = placeholder || { file: 'Search files by name…', cmd: 'Type a command…', line: 'Line number…', custom: 'Type to filter…' }[r.mode];
+    foot.innerHTML = `<span>${hints[r.mode]}</span><span><b>↑↓</b> navigate &nbsp; <b>Enter</b> select &nbsp; <b>Esc</b> close</span>`;
+    list.innerHTML = '';
+    if (!items.length) { list.append(el('div', 'pe', esc(r.empty))); return; }
+    let g = null;
+    items.forEach((it, n) => {
+      if (it.group && it.group !== g) { g = it.group; list.append(el('div', 'pg', esc(g))); }
+      const d = el('div', 'pi' + (n === idx ? ' on' : ''), `<span class="pm"><span class="pn">${hl(it.label, it.pos, it.cat)}</span>${it.sub ? `<span class="pd">${esc(it.sub)}</span>` : ''}</span>${it.kbd ? `<kbd>${esc(it.kbd)}</kbd>` : it.hint ? `<small>${esc(it.hint)}</small>` : ''}`);
+      d.onclick = () => run(n); d.onmousemove = () => { if (idx !== n) { list.querySelector('.pi.on')?.classList.remove('on'); idx = n; d.classList.add('on'); } };
+      list.append(d);
+    });
+    const on = list.querySelector('.pi.on'); if (on) on.scrollIntoView({ block: 'nearest' });
+  };
+  const run = n => { const it = items[n]; if (!it) return; closeModal(); setTimeout(it.run, 0); };
+  const step = d => { if (!items.length) return; idx = d === 'first' ? 0 : d === 'last' ? items.length - 1 : (idx + d + items.length) % items.length; if (typeof d === 'number' && Math.abs(d) > 1) idx = clamp(idx, 0, items.length - 1); render(); };
+  inp.value = prefix || ''; inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); inp.oninput = () => { idx = 0; render(); };
+  inp.onkeydown = e => {
+    if (e.key === 'ArrowDown') { step(1); e.preventDefault(); } else if (e.key === 'ArrowUp') { step(-1); e.preventDefault(); }
+    else if (e.key === 'PageDown') { step(8); e.preventDefault(); } else if (e.key === 'PageUp') { step(-8); e.preventDefault(); }
+    else if (e.key === 'Enter') { e.preventDefault(); run(idx); } else if (e.key === 'Escape') closeModal();
+  };
   render();
 }
-function pickTheme() { palette('', Object.entries(THEMES).map(([k, v]) => ({ label: v.n, hint: k === S.theme ? 'current' : '', run: () => { S.theme = k; applySettings(); } }))); }
+function pickTheme() { palette('', Object.entries(THEMES).map(([k, v]) => ({ label: v.n, hint: k === S.theme ? 'current' : '', run: () => { S.theme = k; applySettings(); } })), 'Select a color theme…'); }
 function showShortcuts() { modal(`<div class="mh">Keyboard Shortcuts<button onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div><div class="mbody">${CMDS.filter(c => c[1]).map(c => `<div class="set"><span>${esc(c[0])}</span><small>${c[1]}</small></div>`).join('')}</div>`); }
 async function showAbout() { let v = '1.0.0'; try { v = (await api.app_info()).version || v; } catch { /* keep default */ } modal(`<div class="mh">About<button onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div><div class="mbody"><div><b>Arcaw ${esc(v)}</b></div><div>Electron · Monaco Editor 0.52</div></div>`); }
 
@@ -900,8 +1019,8 @@ document.addEventListener('click', e => { const c = e.target.closest('[data-cmd]
 /* ---------- Layout: side views, resizers ---------- */
 function setView(v) {
   sideView = v; $('#side').classList.remove('hidden'); $('#rz-side').classList.remove('hidden');
-  ['explorer', 'search', 'git'].forEach(x => { $('#v-' + x).classList.toggle('hidden', x !== v); document.querySelector(`#act [data-view=${x}]`).classList.toggle('on', x === v); });
-  $('#side-title').textContent = { explorer: 'EXPLORER', search: 'SEARCH', git: 'SOURCE CONTROL' }[v]; $('#sh-ex').classList.toggle('hidden', v !== 'explorer'); $('#sh-git').classList.toggle('hidden', v !== 'git'); if (v === 'git') refreshGit(); persist();
+  ['explorer', 'search', 'git', 'notes'].forEach(x => { $('#v-' + x).classList.toggle('hidden', x !== v); document.querySelector(`#act [data-view=${x}]`).classList.toggle('on', x === v); });
+  $('#side-title').textContent = { explorer: 'EXPLORER', search: 'SEARCH', git: 'SOURCE CONTROL', notes: 'NOTES' }[v]; $('#sh-notes').classList.toggle('hidden', v !== 'notes'); $('#sh-ex').classList.toggle('hidden', v !== 'explorer'); $('#sh-git').classList.toggle('hidden', v !== 'git'); if (v === 'git') refreshGit(); persist();
 }
 document.querySelectorAll('#act [data-view]').forEach(b => { b.onclick = () => setView(b.dataset.view); });
 initExplorerUI();
@@ -913,14 +1032,126 @@ function drag(h, cb) {
   };
 }
 
+/* ---------- Notes: categories (title + description) that hold stacked notes ---------- */
+let notes = [], notesT;
+const NOTE = 'arcaw://note/', noteSel = {};
+const noteOf = p => p && p.startsWith(NOTE) ? notes.find(n => n.id === p.slice(NOTE.length)) : null;
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const fmtDate = t => { try { return new Date(t).toLocaleString('tr-TR', { dateStyle: 'medium', timeStyle: 'short' }); } catch { return ''; } };
+const itemName = it => it.title || (it.body || '').split('\n')[0].trim().slice(0, 60) || 'Untitled';
+function normalizeNotes() {   // older versions stored one body per entry; turn it into a first note
+  for (const n of notes) if (!Array.isArray(n.items)) { n.items = n.body ? [{ id: uid(), title: '', body: n.body, created: n.created || n.ts, ts: n.ts }] : []; delete n.body; }
+}
+const notesSave = () => { clearTimeout(notesT); notesT = setTimeout(() => api.notes_set(notes).catch(e => toast(clean(e), 'err')), 400); };
+const notesFlush = () => { clearTimeout(notesT); return api.notes_set(notes).catch(() => { }); };
+function renderNotes() {
+  const q = $('#n-q').value.trim().toLowerCase(), out = $('#n-list');
+  const hit = x => (x || '').toLowerCase().includes(q);
+  const list = notes.filter(n => !q || hit(n.title) || n.items.some(i => hit(i.title) || hit(i.body)));
+  $('#n-head').textContent = `CATEGORIES (${q ? list.length + ' / ' : ''}${notes.length})`;
+  out.innerHTML = '';
+  if (!list.length) { out.append(el('div', 'n-empty', notes.length ? 'No matching notes.' : 'No categories yet. Click + to add one.')); return; }
+  for (const n of list) {
+    const r = el('div', 'n-item n-cat' + (active === NOTE + n.id ? ' on' : ''));
+    const txt = el('div', 'n-txt');
+    txt.append(el('div', 'n-it', esc(n.title || 'Untitled')), el('div', 'n-dt', `${n.items.length} note${n.items.length === 1 ? '' : 's'} · ${esc(fmtDate(n.created || n.ts))}`));
+    const acts = el('div', 'n-acts');
+    const ed = el('button', '', '<i class="fa-solid fa-pencil"></i>'); ed.title = 'Edit';
+    ed.onclick = e => { e.stopPropagation(); editCategory(n); };
+    const dl = el('button', 'n-x', '<i class="fa-solid fa-trash"></i>'); dl.title = 'Delete';
+    dl.onclick = e => { e.stopPropagation(); deleteCategory(n); };
+    acts.append(ed, dl); r.append(txt, acts);
+    r.onclick = () => openNote(n.id);
+    out.append(r);
+  }
+}
+async function deleteCategory(c) {
+  if ((await api.dlg_confirm(`Delete "${c.title || 'Untitled'}" and its ${c.items.length} note(s)?`, ['Delete', 'Cancel'])) !== 0) return;
+  notes = notes.filter(x => x !== c); notesSave();
+  if (order.includes(NOTE + c.id)) await closeTab(NOTE + c.id);
+  renderNotes();
+}
+function editCategory(c) {   // popup with the category's title and description
+  const b = modal(`<div class="mh">Edit category<button id="ec-x"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="mbody ec-body"><label>Title</label><input id="ec-t" spellcheck="false" placeholder="Title"><div class="ec-foot"><button id="ec-c" class="ec-cancel">Cancel</button><button id="ec-s" class="btn"><i class="fa-solid fa-check"></i> Save</button></div></div>`);
+  const t = b.querySelector('#ec-t'); t.value = c.title || ''; t.focus(); t.select();
+  const save = () => {
+    c.title = t.value.trim(); c.ts = Date.now(); notesSave(); closeModal();
+    renderNotes(); renderTabs(); if (active === NOTE + c.id) renderNotePane();
+  };
+  b.querySelector('#ec-s').onclick = save; b.querySelector('#ec-c').onclick = closeModal; b.querySelector('#ec-x').onclick = closeModal;
+  b.onkeydown = e => { if (e.key === 'Escape') closeModal(); else if (e.key === 'Enter') { e.preventDefault(); save(); } };
+}
+function openNote(id) { const p = NOTE + id; if (!order.includes(p)) order.push(p); activate(p); }
+function renderNotePane() {
+  const c = noteOf(active), box = $('#notepane'); box.innerHTML = '';
+  if (!c) return;
+  const q = $('#n-q').value.trim().toLowerCase();
+  const touch = () => { c.ts = Date.now(); notesSave(); };
+  const input = (tag, cls, obj, key, ph, after) => {
+    const i = el(tag, cls); i.placeholder = ph; i.spellcheck = false; i.value = obj[key] || '';
+    i.oninput = () => { obj[key] = i.value; obj.ts = Date.now(); touch(); if (after) after(); };
+    return i;
+  };
+  const head = el('div', 'np-head', `<div class="np-meta">Created ${esc(fmtDate(c.created || c.ts))}</div>`);
+  const split = el('div', 'np-split'), left = el('div', 'np-items'), right = el('div', 'np-detail');
+  const cur = () => c.items.find(i => i.id === noteSel[c.id]) || null;
+  function drawItems() {
+    left.innerHTML = '';
+    const add = el('button', 'np-add', '<i class="fa-solid fa-plus"></i> Add note');
+    add.onclick = () => { const t = Date.now(), it = { id: uid(), title: '', body: '', created: t, ts: t }; c.items.unshift(it); noteSel[c.id] = it.id; touch(); renderNotes(); drawItems(); drawDetail(true); };
+    left.append(add);
+    const hit = x => (x || '').toLowerCase().includes(q);
+    const catHit = hit(c.title);
+    const shown = c.items.filter(i => !q || catHit || hit(i.title) || hit(i.body));
+    if (!c.items.length) left.append(el('div', 'n-empty', 'No notes yet.'));
+    else if (!shown.length) left.append(el('div', 'n-empty', 'No matching notes.'));
+    for (const it of shown) {
+      const r = el('div', 'n-item' + (it.id === noteSel[c.id] ? ' on' : ''));
+      const txt = el('div', 'n-txt'); txt.append(el('div', 'n-it', esc(itemName(it))), el('div', 'n-dt', esc(fmtDate(it.created || it.ts))));
+      const acts = el('div', 'n-acts'), dl = el('button', 'n-x', '<i class="fa-solid fa-trash"></i>'); dl.title = 'Delete note';
+      dl.onclick = async e => {
+        e.stopPropagation();
+        if ((await api.dlg_confirm(`Delete note "${itemName(it)}"?`, ['Delete', 'Cancel'])) !== 0) return;
+        c.items = c.items.filter(x => x !== it); if (noteSel[c.id] === it.id) noteSel[c.id] = null; touch(); renderNotes(); drawItems(); drawDetail();
+      };
+      acts.append(dl); r.append(txt, acts);
+      r.onclick = () => { noteSel[c.id] = it.id; drawItems(); drawDetail(); };
+      left.append(r);
+    }
+  }
+  function drawDetail(focus) {
+    right.innerHTML = '';
+    const it = cur();
+    if (!it) { right.append(el('div', 'n-empty', c.items.length ? 'Select a note to see its details.' : 'Add a note to get started.')); return; }
+    const top = el('div', 'np-head', `<div class="np-meta">Created ${esc(fmtDate(it.created || it.ts))}${it.ts && it.ts !== (it.created || it.ts) ? ' · Edited ' + esc(fmtDate(it.ts)) : ''}</div>`);
+    const ti = input('input', 'np-ititle', it, 'title', 'Note title', drawItems);
+    right.append(top, ti, input('textarea', 'np-body', it, 'body', 'Write your note…', drawItems));
+    if (focus) ti.focus();
+  }
+  if (!cur() && c.items.length) noteSel[c.id] = c.items[0].id;
+  drawItems(); drawDetail();
+  const wrap = el('div', 'np-wrap');
+  split.append(left, right);
+  wrap.append(el('div', 'np-title', esc(c.title || 'Untitled')), head, split);
+  box.append(wrap);
+}
+function addNote() {
+  $('#n-q').value = ''; setView('notes');
+  const t = Date.now(), n = { id: uid(), title: '', items: [], created: t, ts: t };
+  notes.unshift(n); notesSave(); renderNotes(); openNote(n.id);
+}
+
 /* ---------- Boot ---------- */
 function fail(msg) {
   const w = $('#welcome'); w.classList.remove('hidden');
   order = [WELCOME]; active = WELCOME; renderTabs();
   w.insertAdjacentHTML('afterbegin', `<pre style="color:#e06c75;text-align:left;max-width:90%;white-space:pre-wrap;user-select:text">${esc(msg)}</pre>`);
 }
-window.addEventListener('error', e => toast('Error: ' + e.message, 'err'));
-window.addEventListener('unhandledrejection', e => toast('Error: ' + clean(e.reason), 'err'));
+// Monaco throws this harmless error when a widget of an already closed editor (e.g. the diff popup) finishes rendering
+const benign = m => /has been disposed|ResizeObserver loop/i.test(String(m));
+window.addEventListener('error', e => { if (!benign(e.message)) toast('Error: ' + e.message, 'err'); });
+window.addEventListener('unhandledrejection', e => { if (!benign(clean(e.reason))) toast('Error: ' + clean(e.reason), 'err'); });
 
 function loadMonaco() {
   return new Promise((res, rej) => {
@@ -970,9 +1201,11 @@ async function boot() {
       if (isDir) await setFolder(p); else await openFile(p);
     }
   });
-  api.on('app:close', async () => { if (await confirmQuit()) { await api.state_set(snapshot()); api.win_force(); } });
+  api.on('app:close', async () => { if (await confirmQuit()) { await notesFlush(); await api.state_set(snapshot()); api.win_force(); } });
   api.on('update:status', onUpdate); api.update_state().then(s => { if (s) onUpdate(s, true); }).catch(() => { });
   $('#st-update').onclick = installUpdate;
+  try { notes = await api.notes_get(); } catch { notes = []; } normalizeNotes();
+  $('#n-add').onclick = addNote; $('#n-q').oninput = () => { renderNotes(); if (noteOf(active)) renderNotePane(); }; renderNotes();
   setView(st.sideView || 'explorer');
   if (st.folder && S.restoreSession) { root = st.folder; expanded = new Set(st.expanded || []); }
   try { const info = await api.app_info(); HOME = info.home; IS_WIN = !!info.win; WIN_BUILD = info.winBuild || 0; SHELLS = await api.pty_shells(); } catch { /* optional */ }
@@ -983,5 +1216,9 @@ async function boot() {
   try { await loadMonaco(); initEditor(); } catch (e) { fail(e.message); return; }
   if (S.restoreSession) for (const p of st.tabs || []) await openFile(p);
   if (st.active && files.has(st.active)) activate(st.active); else if (!order.length) openWelcome();
+  // files passed by the OS ("Open with", double-click, drag onto exe)
+  const openExternal = async list => { let last; for (const p of list || []) { await openFile(p); last = p; } if (last && files.has(last)) activate(last); };
+  api.on('app:open', openExternal);
+  try { await openExternal(await api.app_pending()); } catch { /* optional */ }
 }
 boot().catch(e => fail('Startup error: ' + (e.stack || e)));

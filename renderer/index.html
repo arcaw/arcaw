@@ -23,6 +23,7 @@
       <button data-view="explorer" title="Explorer (Ctrl+Shift+E)"><i class="fa-regular fa-folder-closed"></i></button>
       <button data-view="search" title="Search (Ctrl+Shift+F)"><i class="fa-solid fa-magnifying-glass"></i></button>
       <button data-view="git" title="Source Control (Ctrl+Shift+G)"><i class="fa-solid fa-code-branch"></i><span id="g-badge" class="badge hidden"></span></button>
+      <button data-view="notes" title="Notes"><i class="fa-solid fa-note-sticky"></i></button>
     </div>
     <div>
       <button data-cmd="View: Toggle Terminal" title="Terminal (Ctrl+`)"><i class="fa-solid fa-terminal"></i></button>
@@ -34,6 +35,7 @@
       <span class="sh-a" id="sh-ex"><button data-cmd="File: New File" title="New File"><i class="fa-solid fa-file-circle-plus"></i></button>
       <button data-cmd="File: New Folder" title="New Folder"><i class="fa-solid fa-folder-plus"></i></button>
       <button id="tree-refresh" title="Refresh"><i class="fa-solid fa-rotate"></i></button></span>
+      <span class="sh-a hidden" id="sh-notes"><button id="n-add" title="New Note"><i class="fa-solid fa-plus"></i></button></span>
       <span class="sh-a hidden" id="sh-git"><button id="g-refresh" title="Refresh"><i class="fa-solid fa-rotate-right"></i></button></span></div>
     <div id="v-explorer" class="sv" tabindex="0"><div id="tree"></div></div>
     <div id="v-search" class="sv hidden">
@@ -41,6 +43,11 @@
       <input type="checkbox" id="s-case" class="hidden"></div>
       <div id="s-head" class="s-head">RESULTS (0)</div>
       <div id="s-out"></div>
+    </div>
+    <div id="v-notes" class="sv hidden">
+      <div class="pad"><div class="sin"><i class="fa-solid fa-magnifying-glass"></i><input id="n-q" placeholder="Search title, description, notes" spellcheck="false"></div></div>
+      <div id="n-head" class="s-head">NOTES (0)</div>
+      <div id="n-list"></div>
     </div>
     <div id="v-git" class="sv hidden">
       <div id="g-empty" class="g-empty hidden"></div>
@@ -69,12 +76,13 @@
     <div id="stage">
       <div id="ed"><div id="editor-host"></div>
         <div id="settings" class="hidden"></div>
+        <div id="notepane" class="hidden"></div>
         <div id="welcome" class="hidden">
           <i class="fa-brands fa-atom big"></i><h1>ARCAW</h1><p>A hackable text editor for the 21st century</p>
           <div class="cards">
             <div data-cmd="File: Open Folder…"><i class="fa-regular fa-folder-open"></i><b>Open Folder</b><small>Ctrl+O</small></div>
             <div data-cmd="File: Open File…"><i class="fa-regular fa-file"></i><b>Open File</b><small>Ctrl+Shift+O</small></div>
-            <div data-cmd="View: Command Palette"><i class="fa-solid fa-terminal"></i><b>Command Palette</b><small>Ctrl+Shift+P</small></div>
+            <div data-cmd="View: Command Palette"><i class="fa-solid fa-terminal"></i><b>Search in Files</b><small>Ctrl+Shift+P</small></div>
             <div data-cmd="Preferences: Color Theme"><i class="fa-solid fa-palette"></i><b>Choose Theme</b><small>5 themes</small></div>
           </div>
         </div>

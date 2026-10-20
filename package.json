@@ -1,6 +1,6 @@
 {
   "name": "arcaw",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Arcaw - Desktop code editor",
   "main": "main.js",
   "author": "Arcaw",
@@ -62,6 +62,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
+      "uninstallDisplayName": "Arcaw",
       "artifactName": "Arcaw-Setup-${version}.${ext}"
     },
     "publish": [

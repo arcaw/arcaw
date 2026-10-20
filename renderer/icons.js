@@ -39,6 +39,10 @@
     refresh: REFRESH,
     'cloud-arrow-up': '<path d="M12 13v8"/><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="m8 17 4-4 4 4"/>',
     'cloud-arrow-down': '<path d="M12 13v8l-4-4"/><path d="m12 21 4-4"/><path d="M4.393 15.269A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/>',
+    note: '<path d="M15.5 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3Z"/><path d="M15 3v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/>',
+    pencil: '<path d="M17 3a2.85 2.85 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>',
+    trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+    plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
     check: '<path d="M20 6 9 17l-5-5"/>',
     'circle-check': '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
     'circle-exclamation': '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
@@ -47,7 +51,7 @@
     braces: '<path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1"/><path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"/>'
   };
   // font-awesome style names used in the markup -> icon above
-  const ALIAS = { xmark: 'x', 'code-branch': 'git-branch', 'folder-closed': 'folder', 'file-circle-plus': 'file-plus', 'file-lines': 'file-text', 'magnifying-glass': 'search', gear: 'settings', 'rotate-right': 'refresh', rotate: 'refresh', 'arrows-rotate': 'refresh', 'brackets-curly': 'braces', markdown: 'file-text', txt: 'file-text' };
+  const ALIAS = { 'note-sticky': 'note', xmark: 'x', 'code-branch': 'git-branch', 'folder-closed': 'folder', 'file-circle-plus': 'file-plus', 'file-lines': 'file-text', 'magnifying-glass': 'search', gear: 'settings', 'rotate-right': 'refresh', rotate: 'refresh', 'arrows-rotate': 'refresh', 'brackets-curly': 'braces', markdown: 'file-text', txt: 'file-text' };
   const LOGO = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="5.5" fill="#11111d"/><g transform="translate(3, 3) scale(0.75)" stroke="#fff" fill="none" stroke-width="1.5"><path d="M12 2L20.66 7V17L12 22L3.34 17V7L12 2Z" fill="#11111d"/><circle cx="12" cy="12" r="3" fill="#11111d"/><ellipse cx="12" cy="12" rx="3.5" ry="8" transform="rotate(30 12 12)"/><ellipse cx="12" cy="12" rx="3.5" ry="8" transform="rotate(-30 12 12)"/><ellipse cx="12" cy="12" rx="3.5" ry="8" transform="rotate(90 12 12)"/></g></svg>';
   const WRAP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
   const FAM = new Set(['fa-solid', 'fa-regular', 'fa-brands', 'fa-spin']);
